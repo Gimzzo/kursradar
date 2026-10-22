@@ -1,1 +1,1 @@
-{"at":0,"ok":{},"errors":{}}
+{"at":1792692796984,"ok":{"SPCX-1h":{"bars":641,"source":"Yahoo Finance"},"SPCX-1d":{"bars":92,"source":"Yahoo Finance"},"SPCX-1w":{"bars":21,"source":"Yahoo Finance"},"news-SPCX":{"items":20,"feeds":["Google News (DE)","Yahoo Finance","Google News (EN)"]},"news-XRP":{"items":20,"feeds":["Google News (DE)","Cointelegraph","Google News (EN)"]},"news-ADA":{"items":20,"feeds":["Google News (DE)","Cointelegraph","Google News (EN)"]}},"errors":{"news-XRP-partial":"CryptoCompare: HTTP 401","news-ADA-partial":"CryptoCompare: HTTP 401"}}
