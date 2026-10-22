@@ -52,13 +52,11 @@ const NEWS = {
   XRP: [
     ['Google News (DE)', () => get(gnews('XRP Ripple', 'de')).then(x => parseRss(x, { feed: 'google' }))],
     ['Cointelegraph', () => get('https://cointelegraph.com/rss/tag/ripple').then(x => parseRss(x, { limit: 12 }))],
-    ['CryptoCompare', () => cryptoCompare('XRP')],
     ['Google News (EN)', () => get(gnews('XRP Ripple', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
   ],
   ADA: [
     ['Google News (DE)', () => get(gnews('Cardano ADA', 'de')).then(x => parseRss(x, { feed: 'google' }))],
     ['Cointelegraph', () => get('https://cointelegraph.com/rss/tag/cardano').then(x => parseRss(x, { limit: 12 }))],
-    ['CryptoCompare', () => cryptoCompare('ADA')],
     ['Google News (EN)', () => get(gnews('Cardano ADA', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
   ],
   SPCX: [
@@ -91,6 +89,9 @@ async function yahooChart(sym, tf) {
   const r4 = x => Math.round(x * 10000) / 10000;
   const bars = ts.map((t, i) => [t, q.open?.[i], q.high?.[i], q.low?.[i], q.close?.[i], q.volume?.[i] || 0]).filter(b => b[1] != null && b[2] != null && b[3] != null && b[4] != null).map(b => [b[0], r4(b[1]), r4(b[2]), r4(b[3]), r4(b[4]), Math.round(b[5])]);
   if (!bars.length) throw new Error('keine Kurse');
+  // Yahoo hängt eine „Live“-Kerze mit aktuellem Zeitstempel an: auf das Intervall ausrichten, bei Kollision verschmelzen
+  const sec = tf === '1h' ? 3600 : tf === '1w' ? 604800 : 86400;
+  if (bars.length > 1) { const last = bars[bars.length - 1], prev = bars[bars.length - 2]; const aligned = tf === '1d' ? last[0] : (tf === '1w' ? (last[0] - prev[0] < sec ? prev[0] : last[0]) : Math.floor(last[0] / sec) * sec); if (aligned === prev[0]) { prev[2] = Math.max(prev[2], last[2]); prev[3] = Math.min(prev[3], last[3]); prev[4] = last[4]; prev[5] += last[5]; bars.pop(); } else last[0] = aligned; }
   const m = res.meta || {}; const meta = {}; for (const k of ['regularMarketPrice', 'previousClose', 'chartPreviousClose', 'regularMarketDayHigh', 'regularMarketDayLow', 'regularMarketVolume', 'fiftyTwoWeekHigh', 'fiftyTwoWeekLow', 'regularMarketTime', 'exchangeName', 'fullExchangeName', 'currency', 'currentTradingPeriod']) if (m[k] != null) meta[k] = m[k];
   return { bars, meta, source: 'Yahoo Finance' };
 }
