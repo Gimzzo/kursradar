@@ -315,7 +315,7 @@ footer{max-width:1180px;margin:0 auto;padding:8px 16px 28px;font-size:11.5px;col
 </main>
 
 <footer>
-  Datenquellen: CoinGecko, Binance, Kraken (Krypto-Kurse) · Yahoo Finance / Stooq über öffentliche CORS-Proxys (corsproxy.io, allorigins.win, codetabs.com), optional Twelve Data (SPCX) · Google News (deutsch, via Proxy), CoinDesk/CryptoCompare, Yahoo Finance RSS (News) · Claude-API mit Websuche (KI-Analyse, KI-News) · Frankfurter (EUR-Umrechnung).
+  Datenquellen: CoinGecko, Binance, Kraken (Krypto-Kurse) · Kursradar-Datenfeed (GitHub Actions, alle 15 Min.: Yahoo Finance/Stooq für SPCX; Google News, Cointelegraph, CryptoCompare, Yahoo Finance für News), Reserve über öffentliche CORS-Proxys · optional Twelve Data (SPCX) · Claude-API mit Websuche (KI-Analyse, KI-News) · Frankfurter (EUR-Umrechnung).
   Alle Angaben ohne Gewähr, keine Anlageberatung. Diese Datei läuft komplett lokal im Browser; API-Keys werden nur im Browser-Speicher (localStorage) dieses Geräts abgelegt.
 </footer>
 
@@ -342,7 +342,7 @@ footer{max-width:1180px;margin:0 auto;padding:8px 16px 28px;font-size:11.5px;col
     <div class="field">
       <label for="inTwelve">Twelve Data API-Key (optional, SpaceX-Aktie SPCX)</label>
       <div class="inrow"><input type="password" id="inTwelve" placeholder="Twelve Data Key" autocomplete="off" spellcheck="false"><button class="btn sm" type="button" data-reveal="inTwelve">👁</button></div>
-      <div class="hint">Ohne Key kommen die SPCX-Kurse kostenlos von Yahoo Finance (Reserve: Stooq) über einen öffentlichen CORS-Proxy – praktisch, aber ohne Garantie und ggf. 15 Min. verzögert. Mit kostenlosem Key von <a href="https://twelvedata.com/" target="_blank" rel="noopener">twelvedata.com</a> (800 Abfragen/Tag) läuft es direkt und stabiler. <span id="twelveTest"></span></div>
+      <div class="hint">Ohne Key kommen die SPCX-Kurse aus dem Kursradar-Datenfeed (Yahoo Finance, alle 15 Min. aktualisiert, ggf. 15 Min. verzögert). Mit kostenlosem Key von <a href="https://twelvedata.com/" target="_blank" rel="noopener">twelvedata.com</a> (800 Abfragen/Tag) kommen die Kurse direkt und minutengenau. <span id="twelveTest"></span></div>
     </div>
 
     <div class="field" id="installField"><label>Als App auf dem Startbildschirm</label><div class="hint" id="installHint">Android/Chrome: Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. iPhone/Safari: Teilen-Symbol → „Zum Home-Bildschirm“. Danach startet Kursradar wie eine App im Vollbild.</div></div>
@@ -486,7 +486,7 @@ async function loadCryptoQuotes() {
 
 function tdError(j) { const c = +j.code; if (c === 401) return 'Twelve Data: ungültiger API-Key'; if (c === 429) return 'Twelve Data: Limit erreicht (8 Abfragen/Min., 800/Tag) – bitte kurz warten'; if (c === 404) return 'Twelve Data: Symbol nicht gefunden'; return 'Twelve Data: ' + (j.message || ('Fehler ' + c)); }
 // Öffentliche CORS-Proxys für Quellen ohne CORS-Freigabe (Yahoo Finance, Stooq). Reihenfolge = Priorität.
-const PROXIES = [u => 'https://corsproxy.io/?url=' + encodeURIComponent(u), u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u), u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u), u => 'https://corsproxy.io/?' + encodeURIComponent(u)];
+const PROXIES = [u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u), u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u), u => 'https://api.cors.lol/?url=' + encodeURIComponent(u), u => 'https://thingproxy.freeboard.io/fetch/' + u];
 const proxyState = { bad: {} }; // Proxy-Index -> Zeitpunkt bis zu dem er gemieden wird
 function proxyOrder() { const now = Date.now(); const pref = storeGet('proxyPref'); const idx = PROXIES.map((_, i) => i).filter(i => !(proxyState.bad[i] > now)); if (!idx.length) return PROXIES.map((_, i) => i); if (pref != null && idx.includes(pref)) { idx.splice(idx.indexOf(pref), 1); idx.unshift(pref); } return idx; }
 async function viaProxy(url, { timeout = 15000, text = false } = {}) {
@@ -494,10 +494,25 @@ async function viaProxy(url, { timeout = 15000, text = false } = {}) {
   for (const i of order) {
     const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), timeout);
     try { const r = await fetch(PROXIES[i](url), { signal: ctl.signal, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); const body = await r.text(); if (!body || body.length < 20) throw new Error('leere Antwort'); if (/^\s*</.test(body) && /<title>[^<]*(error|denied|blocked|captcha)/i.test(body)) throw new Error('vom Proxy blockiert'); let out = body; if (!text) { try { out = JSON.parse(body); } catch (e) { throw new Error('kein JSON'); } } storeSet('proxyPref', i); return out; }
-    catch (e) { const msg = e.name === 'AbortError' ? 'Timeout' : e.message; errs.push(msg); if (/Timeout|HTTP 5|HTTP 429|blockiert/.test(msg)) proxyState.bad[i] = Date.now() + 90000; }
+    catch (e) { const msg = e.name === 'AbortError' ? 'Timeout' : e.message; errs.push(msg); if (/Timeout|HTTP 5|HTTP 429|HTTP 401|HTTP 403|blockiert/.test(msg)) proxyState.bad[i] = Date.now() + (/HTTP 401/.test(msg) ? 600000 : 90000); }
     finally { clearTimeout(id); }
   }
   throw new Error('kein Proxy erreichbar (' + [...new Set(errs)].join(', ') + ')');
+}
+// Kursradar-Datenfeed: GitHub Actions legt alle 15 Min. data/*.json neben die App (gleiche Domain, kein CORS)
+async function loadLocalData(name) {
+  if (!/^https?:$/.test(location.protocol)) throw new Error('nur online verfügbar');
+  const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), 12000);
+  try { const r = await fetch('data/' + name + '.json', { signal: ctl.signal, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); const j = await r.json(); if (!j || !j.at) throw new Error('leer'); return j; }
+  catch (e) { throw new Error(e.name === 'AbortError' ? 'Timeout' : e.message); } finally { clearTimeout(id); }
+}
+async function loadLocalStock(a, tf) {
+  const j = await loadLocalData((tf === '4h' ? a.symbol.toLowerCase() + '-1h' : a.symbol.toLowerCase() + '-' + tf));
+  let bars = (j.bars || []).map(r => ({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5] || 0 })); if (tf === '4h') bars = aggregate(bars, 14400);
+  bars = cleanBars(bars); if (!bars.length) throw new Error('keine Kurse im Feed');
+  const q = stockQuoteFromBars(bars, Object.assign({ source: 'Kursradar-Feed · ' + (j.source || 'Yahoo') }, j.meta || {}));
+  if (q && !(j.meta && j.meta.regularMarketTime)) q.updated = j.at;
+  return { bars, source: 'Kursradar-Feed (' + (j.source || 'Yahoo') + ', alle 15 Min.)', quote: q, feedAt: j.at };
 }
 const Y_TF = { '1h': { interval: '60m', range: '6mo' }, '4h': { interval: '60m', range: '1y', agg: 14400 }, '1d': { interval: '1d', range: '5y' }, '1w': { interval: '1wk', range: '10y' } };
 function stockQuoteFromBars(bars, meta) {
@@ -538,9 +553,10 @@ async function loadTwelveSeries(a, tf) {
 async function loadStockSeries(a, tf) {
   const errs = [];
   if (S.twelveKey) { try { return await loadTwelveSeries(a, tf); } catch (e) { errs.push(e.message); } }
+  try { return await loadLocalStock(a, tf); } catch (e) { errs.push('Feed: ' + e.message); }
   try { return await loadYahooSeries(a, tf); } catch (e) { errs.push(e.message); }
   try { return await loadStooqSeries(a, tf); } catch (e) { errs.push(e.message); }
-  throw new Error([...new Set(errs)].join(' · ') + (S.twelveKey ? '' : ' – Tipp: kostenlosen Twelve-Data-Key in ⚙ eintragen (direkte Verbindung ohne Proxy)'));
+  throw new Error([...new Set(errs)].join(' · ') + (S.twelveKey ? '' : ' – Tipp: kostenlosen Twelve-Data-Key in ⚙ eintragen (direkte Verbindung)'));
 }
 async function loadStockQuote(a) {
   if (S.twelveKey) {
@@ -578,10 +594,12 @@ async function loadCryptoCompareNews(a) {
 }
 function withTimeout(p, ms, label) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(label + ': Zeitüberschreitung')), ms))]); }
 async function loadNewsFeed(a) {
+  const errs0 = [];
+  try { const j = await loadLocalData('news-' + a.id); const items = (j.items || []).filter(x => x && x.title && x.url); if (items.length) return { items, source: 'Kursradar-Feed', at: j.at, feeds: j.feeds }; throw new Error('leer'); } catch (e) { errs0.push('Feed: ' + e.message); }
   const chain = a.type === 'crypto'
     ? [['Google News', () => loadGoogleNews(a, 'de')], ['CoinDesk', () => loadCoindeskNews(a)], ['CryptoCompare', () => loadCryptoCompareNews(a)], ['Google News (EN)', () => loadGoogleNews(a, 'en')], ['Bing News', () => loadBingNews(a)]]
     : [['Google News', () => loadGoogleNews(a, 'de')], ['Yahoo Finance', () => loadYahooNews(a)], ['Google News (EN)', () => loadGoogleNews(a, 'en')], ['Bing News', () => loadBingNews(a)]];
-  const errs = [];
+  const errs = errs0;
   for (const [name, fn] of chain) { try { const items = await withTimeout(fn(), 25000, name); if (items && items.length) return { items, source: name }; } catch (e) { errs.push(name + ': ' + e.message); } }
   throw new Error(errs.join(' · '));
 }
@@ -1002,11 +1020,11 @@ function startTimer() { if (timer) clearInterval(timer); if (!S.autoRefresh) ret
 async function loadNews(id, force) {
   const a = ASSETS[id], d = state.data[id]; if (d.newsLoading) return;
   if (!force && !d.news) { const c = storeGet('news.' + id); if (c && c.items && c.items.length && Date.now() - c.at < 30 * 60000) { d.news = c.items; d.newsAt = c.at; d.newsSource = c.source + ' (zwischengespeichert)'; } }
-  if (!force && d.news && Date.now() - d.newsAt < 10 * 60000) { if (id === state.selected) renderNews(); return; }
+  if (!force && d.news && Date.now() - (d.newsLoadedAt || 0) < 5 * 60000) { if (id === state.selected) renderNews(); return; }
   d.newsLoading = true; d.newsStale = false; if (id === state.selected) renderNews();
   let lastErr = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    try { const r = await loadNewsFeed(a); d.news = r.items; d.newsAt = Date.now(); d.newsSource = r.source; delete d.err.news; storeSet('news.' + id, { items: r.items.slice(0, 20), at: d.newsAt, source: r.source }); lastErr = null; break; }
+    try { const r = await loadNewsFeed(a); d.news = r.items; d.newsAt = r.at || Date.now(); d.newsLoadedAt = Date.now(); d.newsSource = r.source + (r.feeds && r.feeds.length ? ' (' + r.feeds.join(', ') + ')' : ''); delete d.err.news; storeSet('news.' + id, { items: r.items.slice(0, 20), at: d.newsAt, source: r.source }); lastErr = null; break; }
     catch (e) { lastErr = e; if (attempt === 0) await sleep(1500); }
   }
   if (lastErr) { d.err.news = lastErr.message; if (d.news) d.newsStale = true; }
@@ -1020,7 +1038,7 @@ function renderNews() {
   if (d.aiNews && d.aiNews.items && d.aiNews.items.length) body += `<div class="muted small" style="margin-bottom:6px">KI-Suche (${esc(d.aiNews.model || 'Claude')}) · ${timeAgo(d.aiNews.at)}</div><ul class="news">${d.aiNews.items.map(newsItem).join('')}</ul>`;
   if (d.news && d.news.length) {
     const limit = d.newsExpanded ? d.news.length : 5; const shown = d.news.slice(0, limit);
-    body += `<div class="muted small" style="margin:${d.aiNews ? 12 : 0}px 0 6px">${esc(d.newsSource)} · ${timeAgo(d.newsAt)}${/^Google News$/.test(d.newsSource) ? ' · deutschsprachig, letzte 7 Tage' : ''}${d.newsStale ? ' · <span class="warn">Aktualisierung fehlgeschlagen, zeige letzte Liste</span>' : ''}</div><ul class="news">${shown.map(newsItem).join('')}</ul>${d.news.length > 5 ? `<button class="btn sm" id="btnNewsMore" style="margin-top:8px">${d.newsExpanded ? 'Weniger anzeigen' : `Mehr anzeigen (${d.news.length - 5} weitere)`}</button>` : ''}`;
+    body += `<div class="muted small" style="margin:${d.aiNews ? 12 : 0}px 0 6px">${esc(d.newsSource)} · ${timeAgo(d.newsAt)}${/^Google News$/.test(d.newsSource) ? ' · deutschsprachig, letzte 7 Tage' : ''}${/^Kursradar-Feed/.test(d.newsSource) ? ' · alle 15 Min. aktualisiert' : ''}${d.newsStale ? ' · <span class="warn">Aktualisierung fehlgeschlagen, zeige letzte Liste</span>' : ''}</div><ul class="news">${shown.map(newsItem).join('')}</ul>${d.news.length > 5 ? `<button class="btn sm" id="btnNewsMore" style="margin-top:8px">${d.newsExpanded ? 'Weniger anzeigen' : `Mehr anzeigen (${d.news.length - 5} weitere)`}</button>` : ''}`;
   } else if (d.newsLoading) body += `<div class="progress"><span class="spinner"></span> Lade News…</div>`;
   else if (d.err.news) body += `<div class="err-box">News-Feed gerade nicht erreichbar – bitte in einer Minute „Feed neu laden“ versuchen.<details class="small muted" style="margin-top:4px"><summary>Details</summary>${esc(d.err.news)}</details></div>`;
   const busy = d.aiNewsLoading;
