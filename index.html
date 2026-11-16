@@ -19,7 +19,7 @@
   --bg:#0e1319; --surface:#161c25; --surface2:#1d2531; --surface3:#242e3b; --border:#283241; --text:#e8eef5; --muted:#8e9bab; --muted2:#6a7686;
   --accent:#3d8bff; --accent-soft:rgba(61,139,255,.14); --up:#26a69a; --down:#ef5350; --warn:#e6a23c; --neutral:#8e9bab;
   --chart-bg:#161c25; --chart-grid:#1f2833; --chart-axis:#2b3645; --chart-text:#8e9bab; --chart-cross:#9aa7b8;
-  --ema20:#c2861d; --ema50:#3a86e6; --ema200:#cf5597; --bb:#7f93ab; --rsi:#b48be8; --macd:#3a86e6; --signal:#e6a23c;
+  --ema20:#c2861d; --ema50:#3a86e6; --ema200:#cf5597; --bb:#7f93ab; --rsi:#b48be8; --macd:#3a86e6; --signal:#e6a23c; --halving:#f0a030;
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 24px -12px rgba(0,0,0,.6);
   --r:14px; --r-sm:9px;
 }
@@ -27,7 +27,7 @@
   --bg:#f3f5f8; --surface:#ffffff; --surface2:#f1f4f8; --surface3:#e7ecf2; --border:#dde3eb; --text:#19222d; --muted:#5e6b7a; --muted2:#8a95a3;
   --accent:#1f6fe0; --accent-soft:rgba(31,111,224,.10); --up:#0f9d78; --down:#d63f3f; --warn:#c47d0a; --neutral:#5e6b7a;
   --chart-bg:#ffffff; --chart-grid:#edf1f5; --chart-axis:#d5dce5; --chart-text:#5e6b7a; --chart-cross:#4a5563;
-  --ema20:#c47d0a; --ema50:#1f6fe0; --ema200:#c2318e; --bb:#6b7c90; --rsi:#7b48c8; --macd:#1f6fe0; --signal:#c47d0a;
+  --ema20:#c47d0a; --ema50:#1f6fe0; --ema200:#c2318e; --bb:#6b7c90; --rsi:#7b48c8; --macd:#1f6fe0; --signal:#c47d0a; --halving:#c96a00;
   --shadow:0 1px 2px rgba(16,24,40,.06), 0 8px 24px -14px rgba(16,24,40,.18);
 }
 :root[data-cvd="1"]{ --up:#2962ff; --down:#f57c00; }
@@ -397,7 +397,7 @@ async function getJSON(url, { timeout = 15000, headers } = {}) {
 }
 
 /* ---------- Einstellungen ---------- */
-const DEFAULTS = { anthropicKey: '', twelveKey: '', model: 'claude-sonnet-5-5', theme: 'dark', autoRefresh: true, cvd: false, tf: '1d', chartType: 'candles', ind: { ema20: true, ema50: true, ema200: true, bb: false, vol: true, rsi: true, macd: true, sr: true, fib: false }, selected: 'XRP' };
+const DEFAULTS = { anthropicKey: '', twelveKey: '', model: 'claude-sonnet-5-5', theme: 'dark', autoRefresh: true, cvd: false, tf: '1d', chartType: 'candles', ind: { ema20: true, ema50: true, ema200: true, bb: false, vol: true, rsi: true, macd: true, sr: true, fib: false, halving: true }, selected: 'XRP' };
 function loadSettings() { try { const j = JSON.parse(localStorage.getItem('kursradar.settings') || '{}'); return { ...DEFAULTS, ...j, ind: { ...DEFAULTS.ind, ...(j.ind || {}) } }; } catch (e) { return { ...DEFAULTS, ind: { ...DEFAULTS.ind } }; } }
 function saveSettings() { try { localStorage.setItem('kursradar.settings', JSON.stringify(S)); } catch (e) { } }
 let S = loadSettings();
@@ -412,6 +412,16 @@ const ASSETS = {
   SPCX: { id: 'SPCX', name: 'SpaceX', long: 'SpaceX (SPCX, Nasdaq)', type: 'stock', symbol: 'SPCX', newsQuery: 'SpaceX Aktie SPCX', newsSearch: 'SpaceX Aktie OR SPCX', pair: 'SPCX' },
 };
 const ORDER = ['XRP', 'ADA', 'SPCX'];
+// Bitcoin-Halvings (Zeitpunkt des jeweiligen Blocks, UTC); das nächste ist eine Schätzung (Block 1.050.000, ~10 Min./Block)
+const HALVINGS = [
+  { t: 1354116278, block: 210000, label: '1. Halving', reward: '25 BTC' },
+  { t: 1468082773, block: 420000, label: '2. Halving', reward: '12,5 BTC' },
+  { t: 1589225023, block: 630000, label: '3. Halving', reward: '6,25 BTC' },
+  { t: 1713571767, block: 840000, label: '4. Halving', reward: '3,125 BTC' },
+  { t: Math.floor(Date.UTC(2028, 3, 15) / 1000), block: 1050000, label: '5. Halving (erwartet)', reward: '1,5625 BTC', estimated: true },
+];
+function halvingCycle(nowSec) { nowSec = nowSec || Math.floor(Date.now() / 1000); const past = HALVINGS.filter(h => h.t <= nowSec); const last = past[past.length - 1]; const next = HALVINGS.find(h => h.t > nowSec); return { last, next, daysSince: last ? Math.floor((nowSec - last.t) / 86400) : null, daysUntil: next ? Math.ceil((next.t - nowSec) / 86400) : null }; }
+function fmtHalvingDate(h) { return h.estimated ? '≈ April 2028' : fmtDate(h.t * 1000); }
 const TFS = { '1h': { label: '1h', sec: 3600, bin: '1h', krk: 60, td: '1h' }, '4h': { label: '4h', sec: 14400, bin: '4h', krk: 240, td: '4h' }, '1d': { label: '1T', sec: 86400, bin: '1d', krk: 1440, td: '1day' }, '1w': { label: '1W', sec: 604800, bin: '1w', krk: 10080, td: '1week' } };
 
 const state = {
@@ -435,7 +445,7 @@ function aggregate(bars, sec) { const out = []; for (const b of bars) { const bu
 async function loadCryptoSeries(a, tf) {
   const T = TFS[tf]; const errs = [];
   try {
-    const j = await getJSON(`https://api.binance.com/api/v3/klines?symbol=${a.binance}&interval=${T.bin}&limit=${tf === '1w' ? 400 : 700}`);
+    const j = await getJSON(`https://api.binance.com/api/v3/klines?symbol=${a.binance}&interval=${T.bin}&limit=${tf === '1w' ? 500 : 1000}`);
     if (!Array.isArray(j) || !j.length) throw new Error('keine Daten');
     return { bars: cleanBars(j.map(k => ({ t: Math.floor(k[0] / 1000), o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[7] }))), source: 'Binance' };
   } catch (e) { errs.push('Binance: ' + e.message); }
@@ -712,7 +722,7 @@ class KChart {
   constructor(el, opts = {}) {
     this.el = el; this.canvas = document.createElement('canvas'); el.appendChild(this.canvas); this.ctx = this.canvas.getContext('2d');
     this.bars = []; this.meta = { intervalSec: 86400, decimals: 2, lineOnly: false, label: '' };
-    this.overlays = []; this.bands = []; this.subPanes = []; this.markers = []; this.priceLines = [];
+    this.overlays = []; this.bands = []; this.subPanes = []; this.markers = []; this.priceLines = []; this.timeLines = [];
     this.showVolume = true; this.logScale = false;
     this.view = { from: 0, count: 100 }; this.theme = opts.theme || {};
     this.onCrosshair = opts.onCrosshair || null; this.onLayout = opts.onLayout || null;
@@ -728,6 +738,10 @@ class KChart {
   setSubPanes(p) { this.subPanes = p || []; this.request(); }
   setMarkers(m) { this.markers = m || []; this.request(); }
   setPriceLines(l) { this.priceLines = l || []; this.request(); }
+  setTimeLines(l) { this.timeLines = l || []; this.request(); }
+  showTime(t, pad = 0.08) { const vi = this.idxForTime(t); const n = this.bars.length; if (vi == null || !n) return false; const span = Math.max(vi, n - 1) - Math.min(vi, n - 1); const count = Math.max(30, span / (1 - pad - 0.08)); this.view.count = count; this._clamp(); this.view.from = Math.min(vi, n - 1) - this.view.count * pad; this._clamp(); this.request(); return true; }
+  // Index (auch gebrochen oder jenseits des letzten Balkens) für einen Zeitpunkt
+  idxForTime(t) { const b = this.bars, n = b.length; if (!n) return null; if (t < b[0].t) return null; if (t >= b[n - 1].t) return (n - 1) + (t - b[n - 1].t) / (this.meta.intervalSec || 86400); let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (b[m].t <= t) lo = m; else hi = m; } const span = b[hi].t - b[lo].t || 1; return lo + (t - b[lo].t) / span; }
   _axisWidth() { const ctx = this.ctx; ctx.font = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'; let mx = 0; for (const b of this.bars) if (b.h > mx) mx = b.h; const s = fmtNum(mx * 1.1 || 1, this.meta.decimals); this.axisW = clamp(Math.ceil(ctx.measureText(s).width) + 16, 48, 110); }
   fit() { const n = this.bars.length; if (!n) { this.request(); return; } const plotW = this.W - this.axisW; const count = Math.min(n, Math.max(30, Math.round(plotW / 6))); this.view.count = count; this.view.from = n - count + count * 0.06; this._clamp(); this.request(); }
   _clamp() { const n = this.bars.length; this.view.count = clamp(this.view.count, 8, Math.max(60, n * 1.5)); this.view.from = clamp(this.view.from, -this.view.count * 0.6, Math.max(0, n - 3)); }
@@ -803,6 +817,19 @@ class KChart {
     ctx.restore();
     // Preislinien
     for (const pl of this.priceLines) { const y = Y(pl.price); if (y == null || y < priceTop - 10 || y > priceTop + priceH + 10) continue; ctx.save(); ctx.setLineDash(pl.dash || [4, 4]); ctx.strokeStyle = pl.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(plotW, Math.round(y) + 0.5); ctx.stroke(); ctx.restore(); if (pl.label && barW) { ctx.font = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'; ctx.fillStyle = pl.color; ctx.textAlign = 'right'; ctx.fillText(pl.label, plotW - 6, y - 7); ctx.textAlign = 'left'; ctx.font = font; } this._axisTag(fmtNum(pl.price, this.meta.decimals), axisX, y, pl.color, pl.textColor || '#fff'); }
+    // Zeitmarker (z. B. Bitcoin-Halvings)
+    if (this.timeLines.length) {
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, plotW, timeY); ctx.clip();
+      ctx.font = 'bold 10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
+      let labelY = priceTop + 4; const labelReset = labelY;
+      for (const tl of this.timeLines) {
+        const vi = this.idxForTime(tl.t); if (vi == null) continue; const x = Math.round(this.X(vi)) + 0.5;
+        if (x < -2 || x > plotW + 2) { if (!tl.short) continue; const txt = x < 0 ? '◀ ' + tl.short : tl.short + ' ▶'; const tw = ctx.measureText(txt).width + 12; const lx = x < 0 ? 4 : plotW - tw - 4; ctx.globalAlpha = 0.9; ctx.fillStyle = tl.color; this._rr(lx, labelY, tw, 18, 4); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = tl.textColor || '#fff'; ctx.textAlign = 'left'; ctx.fillText(txt, lx + 6, labelY + 9); labelY += 22; continue; }
+        ctx.save(); ctx.setLineDash(tl.estimated ? [2, 4] : [6, 4]); ctx.strokeStyle = tl.color; ctx.globalAlpha = tl.estimated ? 0.6 : 0.85; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, timeY); ctx.stroke(); ctx.restore();
+        if (tl.label) { const tw = ctx.measureText(tl.label).width + 12; const right = x + 6 + tw <= plotW; const lx = right ? x + 6 : x - 6 - tw; if (lx < 0 || lx + tw > plotW) continue; ctx.fillStyle = tl.color; this._rr(lx, labelY, tw, 18, 4); ctx.fill(); ctx.fillStyle = tl.textColor || '#fff'; ctx.textAlign = 'left'; ctx.fillText(tl.label, lx + 6, labelY + 9); labelY += 22; if (labelY > main.top + main.h * 0.5) labelY = labelReset; }
+      }
+      ctx.restore(); ctx.font = font; ctx.textAlign = 'left';
+    }
     // Letzter Kurs
     { const lb = this.bars[n - 1]; const y = Y(lb.c); if (y != null) { const col = (lb.c >= lb.o) ? T.up : T.down; ctx.save(); ctx.setLineDash([2, 3]); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(plotW, Math.round(y) + 0.5); ctx.stroke(); ctx.restore(); this._axisTag(fmtNum(lb.c, this.meta.decimals), axisX, y, col, '#fff'); } }
     // Unterfenster
@@ -880,9 +907,14 @@ function applyChart() {
     if (S.ind.fib && analysis.levels.fib) for (const f of analysis.levels.fib.levels) lines.push({ price: f.price, color: cssVar('--muted'), label: 'Fib ' + fmtNum(f.p * 100, 1) + ' %', dash: [2, 4], textColor: cssVar('--bg') });
     for (const ev of analysis.events) { if (ev.bias === 0) continue; const short = ev.name.startsWith('Golden') ? 'Golden Cross' : ev.name.startsWith('Death') ? 'Death Cross' : ev.name.includes('Divergenz') ? 'Divergenz' : ev.name.includes('Ausbruch') ? 'Ausbruch' : ev.name.includes('Bruch') ? 'Bruch' : ''; if (!short) continue; markers.push({ i: ev.i, position: ev.bias > 0 ? 'below' : 'above', color: ev.bias > 0 ? cssVar('--up') : cssVar('--down'), text: short }); }
   }
-  chart.setOverlays(ov); chart.setBands(bands); chart.setSubPanes(subs); chart.setMarkers(markers); chart.setPriceLines(lines);
+  const tlines = [];
+  if (a.type === 'crypto' && S.ind.halving) { const first = bars[0].t; for (const h of HALVINGS) { if (h.t < first && !h.estimated) continue; tlines.push({ t: h.t, color: cssVar('--halving'), textColor: '#1a1206', estimated: !!h.estimated, label: `BTC-${h.label} · ${h.estimated ? '≈ Apr. 2028' : fmtDate(h.t * 1000)}`, short: h.estimated ? 'Halving ≈ Apr. 2028' : 'Halving ' + fmtDate(h.t * 1000) }); } }
+  chart.setOverlays(ov); chart.setBands(bands); chart.setSubPanes(subs); chart.setMarkers(markers); chart.setPriceLines(lines); chart.setTimeLines(tlines);
+  if (!keep && state.tf === '1w' && tlines.length) { const hc = halvingCycle(); if (hc.last && hc.last.t >= bars[0].t) chart.showTime(hc.last.t); }
   $('#legendRsi').classList.toggle('hidden', !S.ind.rsi || !analysis); $('#legendMacd').classList.toggle('hidden', !S.ind.macd || !analysis);
-  const foot = $('#chartFoot'); foot.innerHTML = `<span>Quelle: <b>${esc(ser.source)}</b>${ser.lineOnly ? ' (Linienchart, Fallback)' : ''}</span><span>${bars.length} ${(S.chartType === 'candles' && !ser.lineOnly) ? 'Kerzen' : 'Punkte'} · ${TFS[state.tf].label}</span><span>Stand ${fmtTime(ser.loadedAt)}</span><span class="right">Ziehen = verschieben · Scrollen/Pinch = zoomen · Doppelklick/-tipp = Fit</span>`;
+  const hc = halvingCycle(); const halvingNote = (a.type === 'crypto' && S.ind.halving) ? `<span style="color:var(--halving)">BTC-Halving: <a href="#" data-jump="${hc.last ? hc.last.t : ''}" style="color:inherit;text-decoration:underline dotted">${hc.last ? fmtDate(hc.last.t * 1000) + ' (vor ' + hc.daysSince + ' Tg.)' : '–'}</a> · nächstes <a href="#" data-jump="${hc.next ? hc.next.t : ''}" style="color:inherit;text-decoration:underline dotted">≈ April 2028</a></span>` : '';
+  const foot = $('#chartFoot'); foot.innerHTML = `${halvingNote}<span>Quelle: <b>${esc(ser.source)}</b>${ser.lineOnly ? ' (Linienchart, Fallback)' : ''}</span><span>${bars.length} ${(S.chartType === 'candles' && !ser.lineOnly) ? 'Kerzen' : 'Punkte'} · ${TFS[state.tf].label}</span><span>Stand ${fmtTime(ser.loadedAt)}</span><span class="right">Ziehen = verschieben · Scrollen/Pinch = zoomen · Doppelklick/-tipp = Fit</span>`;
+  $$('#chartFoot a[data-jump]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); const t = +el.dataset.jump; if (t && !chart.showTime(t)) toast('Zeitpunkt liegt außerhalb der geladenen Daten – Wochenchart (1W) wählen.'); }));
   renderTA(analysis);
   updateLegend(null);
 }
@@ -922,6 +954,7 @@ function renderTA(an) {
       <li><span class="k">Momentum</span><span>${esc(an.text.momentum)}</span></li>
       <li><span class="k">Volatilität</span><span>${esc(an.text.vola)}${perf && perf.vol30 != null ? ` 30-Tage-Volatilität ${fmtNum(perf.vol30, 1)} % pro Tag (annualisiert ≈ ${fmtNum(perf.vol30 * Math.sqrt(a.type === 'crypto' ? 365 : 252), 0)} %).` : ''}</span></li>
       <li><span class="k">Volumen</span><span>${esc(an.text.volume)}</span></li>
+      ${a.type === 'crypto' ? (() => { const hc = halvingCycle(); const bars = state.data[state.selected].daily; let perf = ''; if (hc.last && bars && bars.length) { const at = bars.find(b => b.t >= hc.last.t); if (at && at !== bars[bars.length - 1]) perf = ` ${esc(a.name)} seit dem Halving: ${fmtPct((bars[bars.length - 1].c / at.c - 1) * 100)} (Kurs damals ${fmtNum(at.c, dec)} $).`; } return `<li><span class="k">BTC-Zyklus</span><span>${hc.daysSince} Tage seit dem ${esc(hc.last.label)} (${fmtDate(hc.last.t * 1000)}, Block ${nf(0).format(hc.last.block)}, Belohnung ${hc.last.reward}); nächstes Halving ≈ April 2028 (Block 1.050.000, in ca. ${hc.daysUntil} Tagen).${perf} Historisch lagen die Hochs der Altcoins meist 12–18 Monate nach dem Halving – keine Garantie.</span></li>`; })() : ''}
     </ul>
     <div class="lv">
       <div class="box"><div class="t">Unterstützungen</div>${lvHtml(lv.supports, 'up')}</div>
@@ -969,6 +1002,7 @@ function renderToolbar() {
   const ser0 = currentSeries(); const lineOnly = !!(ser0 && ser0.lineOnly);
   $$('#typeSeg button').forEach(b => { const t = b.dataset.type; const eff = lineOnly && S.chartType === 'candles' ? 'line' : (S.chartType || 'candles'); b.classList.toggle('on', t === eff); b.disabled = lineOnly && t === 'candles'; b.title = (lineOnly && t === 'candles') ? 'Für diese Quelle nur Linie/Fläche verfügbar' : b.title; b.onclick = () => { S.chartType = t; saveSettings(); renderToolbar(); applyChart(); }; });
   const defs = [['ema20', 'EMA 20', '--ema20'], ['ema50', 'EMA 50', '--ema50'], ['ema200', 'EMA 200', '--ema200'], ['bb', 'Bollinger', '--bb'], ['vol', 'Volumen', '--muted'], ['rsi', 'RSI', '--rsi'], ['macd', 'MACD', '--macd'], ['sr', 'Unterst./Widerst.', '--muted'], ['fib', 'Fibonacci', '--muted']];
+  if (ASSETS[state.selected].type === 'crypto') defs.push(['halving', 'BTC-Halving', '--halving']);
   $('#indBar').innerHTML = defs.map(([k, l, c]) => `<button class="tog ${S.ind[k] ? 'on' : ''}" data-ind="${k}" aria-pressed="${!!S.ind[k]}"><span class="sw" style="color:${cssVar(c)}"></span>${l}</button>`).join('');
   $$('#indBar .tog').forEach(b => b.addEventListener('click', () => { S.ind[b.dataset.ind] = !S.ind[b.dataset.ind]; saveSettings(); renderToolbar(); applyChart(); }));
 }
@@ -1009,7 +1043,7 @@ async function loadAll(full) {
   finally { state.busy--; $('#btnRefresh').classList.remove('spin'); }
 }
 function selectAsset(id) {
-  if (!ASSETS[id]) return; state.selected = id; S.selected = id; saveSettings(); renderOverview(); renderPrice(); renderAI(); renderNews();
+  if (!ASSETS[id]) return; state.selected = id; S.selected = id; saveSettings(); renderToolbar(); renderOverview(); renderPrice(); renderAI(); renderNews();
   if (currentSeries()) applyChart(); else loadSeries(id, state.tf, true);
   if (!state.data[id].news && !state.data[id].newsLoading) loadNews(id);
 }
@@ -1111,6 +1145,7 @@ function buildPrompt(a, an, perf, q, news) {
     const pe = [...an.patterns.map(p => p.name), ...an.events.map(e => e.name)]; L.push(`Erkannte Kerzenmuster/Signale: ${pe.length ? pe.join('; ') : 'keine'}.`);
     if (an.levels.fib) L.push(`Fibonacci-Retracement des letzten Swings (${an.levels.fib.up ? 'aufwärts' : 'abwärts'}, ${fmtNum(an.levels.fib.lo, dec)}–${fmtNum(an.levels.fib.hi, dec)}): ` + an.levels.fib.levels.map(f => `${fmtNum(f.p * 100, 1)} % = ${fmtNum(f.price, dec)}`).join(', ') + '.');
   }
+  if (a.type === 'crypto') { const hc = halvingCycle(); L.push(`Bitcoin-Halving-Zyklus: letztes Halving ${fmtDate(hc.last.t * 1000)} (vor ${hc.daysSince} Tagen, Block ${hc.last.block}), nächstes erwartet ≈ April 2028 (in ca. ${hc.daysUntil} Tagen).`); }
   if (d.daily && d.daily.length) { const last = d.daily.slice(-12); L.push(`Letzte Tagesschlusskurse: ` + last.map(b => `${new Date(b.t * 1000).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}: ${fmtNum(b.c, dec)}`).join(' · ')); }
   if (news && news.length) L.push(`Aktuelle Schlagzeilen aus dem Newsfeed:\n` + news.slice(0, 10).map(n => `- ${n.time ? new Date(n.time).toLocaleDateString('de-DE') : (n.date || '')}: ${n.title} (${n.source || ''})`).join('\n'));
   L.push(`\nAufgabe: Recherchiere mit web_search die wichtigsten Nachrichten und Ereignisse der letzten 7 Tage zu „${a.newsQuery}“ (maximal 4 Suchen, bevorzugt seriöse Finanz-/Fachmedien) und erstelle darauf aufbauend eine Analyse, die News und Charttechnik verbindet.`);
