@@ -1,7 +1,7 @@
 {
-  "name": "Kursradar – XRP, Cardano, SpaceX",
+  "name": "Kursradar – Krypto & Aktien",
   "short_name": "Kursradar",
-  "description": "Live-Kurse, Chart-Analyse, News und KI-Analyse für XRP, Cardano und SpaceX (SPCX).",
+  "description": "Live-Kurse, Chart-Analyse, News und KI-Analyse für Bitcoin, XRP, Cardano, SpaceX (SPCX) und Stellantis (STLA).",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

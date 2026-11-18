@@ -49,6 +49,11 @@ const gnews = (q, lang) => lang === 'en' ? `https://news.google.com/rss/search?q
 async function cryptoCompare(cat) { const j = await get(`https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=${cat}&excludeCategories=Sponsored`, { json: true }); return (j.Data || []).map(n => ({ title: n.title, url: n.url, source: n.source_info?.name || n.source || '', time: (n.published_on || 0) * 1000, summary: String(n.body || '').slice(0, 220), image: n.imageurl || '' })).filter(x => x.title && /^https?:/.test(x.url)); }
 
 const NEWS = {
+  BTC: [
+    ['Google News (DE)', () => get(gnews('Bitcoin', 'de')).then(x => parseRss(x, { feed: 'google' }))],
+    ['Cointelegraph', () => get('https://cointelegraph.com/rss/tag/bitcoin').then(x => parseRss(x, { limit: 12 }))],
+    ['Google News (EN)', () => get(gnews('Bitcoin', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
+  ],
   XRP: [
     ['Google News (DE)', () => get(gnews('XRP Ripple', 'de')).then(x => parseRss(x, { feed: 'google' }))],
     ['Cointelegraph', () => get('https://cointelegraph.com/rss/tag/ripple').then(x => parseRss(x, { limit: 12 }))],
@@ -63,6 +68,11 @@ const NEWS = {
     ['Google News (DE)', () => get(gnews('SpaceX Aktie OR SPCX', 'de')).then(x => parseRss(x, { feed: 'google' }))],
     ['Yahoo Finance', () => get('https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPCX&region=US&lang=en-US').then(x => parseRss(x, { limit: 12 }))],
     ['Google News (EN)', () => get(gnews('SpaceX stock OR SPCX', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
+  ],
+  STLA: [
+    ['Google News (DE)', () => get(gnews('Stellantis', 'de')).then(x => parseRss(x, { feed: 'google' }))],
+    ['Yahoo Finance', () => get('https://feeds.finance.yahoo.com/rss/2.0/headline?s=STLA&region=US&lang=en-US').then(x => parseRss(x, { limit: 12 }))],
+    ['Google News (EN)', () => get(gnews('Stellantis stock OR STLA', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
   ],
 };
 
@@ -115,7 +125,7 @@ async function updateStock(sym) {
 
 async function main() {
   await mkdir('data', { recursive: true });
-  await Promise.all([updateNews('XRP'), updateNews('ADA'), updateNews('SPCX'), updateStock('SPCX')]);
+  await Promise.all([updateNews('BTC'), updateNews('XRP'), updateNews('ADA'), updateNews('SPCX'), updateNews('STLA'), updateStock('SPCX'), updateStock('STLA')]);
   const prev = await readJson('data/status.json'); const keep = (prev && prev.ok) || {};
   await writeJson('data/status.json', { at: NOW, ok: { ...keep, ...status.ok }, errors: status.errors });
   console.log('fertig', new Date(NOW).toISOString(), 'Fehler:', Object.keys(status.errors).length);
