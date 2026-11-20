@@ -1,6 +1,6 @@
 # Kursradar
 
-Web-App (PWA) für Bitcoin, XRP, Cardano (ADA) sowie die Aktien SpaceX (SPCX) und Stellantis (STLA): Live-Kurse, Candlestick-Charts mit Indikatoren,
+Web-App (PWA) für Bitcoin, XRP, Cardano (ADA) sowie die Aktien SpaceX (SPCX), Anthropic (ANT) und Stellantis (STLA): Live-Kurse, Candlestick-Charts mit Indikatoren,
 regelbasierte Chart-Analyse, News-Feed und KI-Analyse (Claude mit Websuche).
 
 - Läuft komplett im Browser – eine HTML-Datei, keine Server-Komponente.

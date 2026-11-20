@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 <title>Kursradar – Krypto & Aktien</title>
-<meta name="description" content="Live-Kurse, Chart-Analyse, News und KI-Analyse für Bitcoin, XRP, Cardano, SpaceX (SPCX) und Stellantis (STLA).">
+<meta name="description" content="Live-Kurse, Chart-Analyse, News und KI-Analyse für Bitcoin, XRP, Cardano, SpaceX (SPCX), Anthropic (ANT) und Stellantis (STLA).">
 <meta name="theme-color" content="#0e1319">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -69,7 +69,8 @@ main{max-width:1180px;margin:0 auto;padding:14px 16px 24px}
 
 /* overview */
 .ov-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px}
-@media(min-width:960px){.ov-grid{grid-template-columns:repeat(5,1fr)}}
+@media(min-width:960px){.ov-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1180px){.ov-grid{grid-template-columns:repeat(6,1fr)}}
 .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;cursor:pointer;text-align:left;position:relative;overflow:hidden;box-shadow:var(--shadow);transition:border-color .15s,transform .15s;display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,46%);grid-template-areas:"sym spark" "p spark" "chg spark";align-items:center;column-gap:12px}
 .ov-card .sym{grid-area:sym}.ov-card .p{grid-area:p}.ov-card .chg{grid-area:chg}.ov-card .spark{grid-area:spark;align-self:stretch}.ov-card .err{grid-area:spark}
 @media(min-width:960px){.ov-card{display:block}}
@@ -91,7 +92,7 @@ main{max-width:1180px;margin:0 auto;padding:14px 16px 24px}
   .ov-card .spark{height:44px}
 }
 @media(max-width:959px){.ov-card{padding:8px 12px}.ov-card .p{font-size:18px;margin-top:2px}.ov-card .chg{font-size:11.5px}}
-@media(min-width:960px) and (max-width:1180px){.ov-card .p{font-size:17px}.ov-card .sym{font-size:12px}}
+@media(min-width:1180px){.ov-card .p{font-size:17px}.ov-card .sym{font-size:12px}}
 
 /* price card */
 .price-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -267,7 +268,7 @@ footer{max-width:1180px;margin:0 auto;padding:8px 16px 28px;font-size:11.5px;col
       <div class="logo" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg></div>
       <div>
         <h1>Kursradar</h1>
-        <div class="sub">Bitcoin · XRP · Cardano · SpaceX · Stellantis — Kurse, Chart-Analyse & KI</div>
+        <div class="sub">Bitcoin · XRP · Cardano · SpaceX · Anthropic · Stellantis — Kurse, Chart-Analyse & KI</div>
       </div>
     </div>
     <div class="top-actions">
@@ -323,7 +324,7 @@ footer{max-width:1180px;margin:0 auto;padding:8px 16px 28px;font-size:11.5px;col
 <div class="modal" id="settingsModal" role="dialog" aria-modal="true">
   <div class="panel">
     <h3>Einstellungen</h3>
-    <div class="lead">Keys bleiben lokal in diesem Browser. Alle Kurse (BTC, XRP, ADA, SPCX, STLA) funktionieren ohne Key. Nur die KI-Analyse braucht einen Anthropic-API-Key; der Twelve-Data-Key ist optional.</div>
+    <div class="lead">Keys bleiben lokal in diesem Browser. Alle Kurse (BTC, XRP, ADA, SPCX, ANT, STLA) funktionieren ohne Key. Nur die KI-Analyse braucht einen Anthropic-API-Key; der Twelve-Data-Key ist optional.</div>
 
     <div class="field">
       <label for="inAnthropic">Anthropic API-Key (KI-Analyse &amp; KI-News)</label>
@@ -341,7 +342,7 @@ footer{max-width:1180px;margin:0 auto;padding:8px 16px 28px;font-size:11.5px;col
       <div class="hint">News-Suche läuft immer mit Haiku 5.5 (günstig).</div>
     </div>
     <div class="field">
-      <label for="inTwelve">Twelve Data API-Key (optional, Aktien SPCX &amp; STLA)</label>
+      <label for="inTwelve">Twelve Data API-Key (optional, Aktien SPCX, ANT &amp; STLA)</label>
       <div class="inrow"><input type="password" id="inTwelve" placeholder="Twelve Data Key" autocomplete="off" spellcheck="false"><button class="btn sm" type="button" data-reveal="inTwelve">👁</button></div>
       <div class="hint">Ohne Key kommen die Aktienkurse aus dem Kursradar-Datenfeed (Yahoo Finance, alle 15 Min. aktualisiert, ggf. 15 Min. verzögert). Mit kostenlosem Key von <a href="https://twelvedata.com/" target="_blank" rel="noopener">twelvedata.com</a> (800 Abfragen/Tag) kommen die Kurse direkt und minutengenau. <span id="twelveTest"></span></div>
     </div>
@@ -411,10 +412,11 @@ const ASSETS = {
   BTC: { id: 'BTC', name: 'Bitcoin', long: 'Bitcoin (BTC)', type: 'crypto', cg: 'bitcoin', binance: 'BTCUSDT', kraken: 'XBTUSD', cc: 'BTC', newsQuery: 'Bitcoin Kurs Nachrichten', newsSearch: 'Bitcoin', pair: 'BTC/USD' },
   XRP: { id: 'XRP', name: 'XRP', long: 'XRP (Ripple)', type: 'crypto', cg: 'ripple', binance: 'XRPUSDT', kraken: 'XRPUSD', cc: 'XRP', newsQuery: 'XRP Ripple Kryptowährung', newsSearch: 'XRP Ripple', pair: 'XRP/USD' },
   ADA: { id: 'ADA', name: 'Cardano', long: 'Cardano (ADA)', type: 'crypto', cg: 'cardano', binance: 'ADAUSDT', kraken: 'ADAUSD', cc: 'ADA', newsQuery: 'Cardano ADA Kryptowährung', newsSearch: 'Cardano ADA', pair: 'ADA/USD' },
-  SPCX: { id: 'SPCX', name: 'SpaceX', long: 'SpaceX (SPCX, Nasdaq)', type: 'stock', symbol: 'SPCX', exch: 'Nasdaq', note: 'Börsengang am 12.06.2026', newsQuery: 'SpaceX Aktie SPCX', newsSearch: 'SpaceX Aktie OR SPCX', pair: 'SPCX' },
-  STLA: { id: 'STLA', name: 'Stellantis', long: 'Stellantis (STLA, NYSE)', type: 'stock', symbol: 'STLA', exch: 'NYSE', note: 'Automobilkonzern (Peugeot, Citroën, Opel, Fiat, Jeep, Chrysler u. a.); Hauptnotierungen Mailand, Paris und New York – hier NYSE in USD', newsQuery: 'Stellantis Aktie', newsSearch: 'Stellantis', pair: 'STLA' },
+  SPCX: { id: 'SPCX', name: 'SpaceX', long: 'SpaceX (SPCX, Nasdaq)', type: 'stock', symbol: 'SPCX', exch: 'Nasdaq', tdExchange: 'NASDAQ', note: 'Börsengang am 12.06.2026', newsQuery: 'SpaceX Aktie SPCX', newsSearch: 'SpaceX Aktie OR SPCX', pair: 'SPCX' },
+  ANT: { id: 'ANT', name: 'Anthropic', long: 'Anthropic (ANT, Nasdaq)', type: 'stock', symbol: 'ANT', exch: 'Nasdaq', tdExchange: 'NASDAQ', note: 'KI-Unternehmen hinter Claude; Börsengang am 19.11.2026 zu 83 $ (erster Kurs 111,50 $, Schluss Tag 1: 97,17 $) – sehr kurze Kurshistorie, Indikatoren erst nach einigen Handelstagen aussagekräftig', newsQuery: 'Anthropic Aktie ANT', newsSearch: 'Anthropic Aktie OR Anthropic Börsengang', pair: 'ANT' },
+  STLA: { id: 'STLA', name: 'Stellantis', long: 'Stellantis (STLA, NYSE)', type: 'stock', symbol: 'STLA', exch: 'NYSE', tdExchange: 'NYSE', note: 'Automobilkonzern (Peugeot, Citroën, Opel, Fiat, Jeep, Chrysler u. a.); Hauptnotierungen Mailand, Paris und New York – hier NYSE in USD', newsQuery: 'Stellantis Aktie', newsSearch: 'Stellantis', pair: 'STLA' },
 };
-const ORDER = ['BTC', 'XRP', 'ADA', 'SPCX', 'STLA'];
+const ORDER = ['BTC', 'XRP', 'ADA', 'SPCX', 'ANT', 'STLA'];
 // Bitcoin-Halvings (Zeitpunkt des jeweiligen Blocks, UTC); das nächste ist eine Schätzung (Block 1.050.000, ~10 Min./Block)
 const HALVINGS = [
   { t: 1354116278, block: 210000, label: '1. Halving', reward: '25 BTC' },
@@ -557,7 +559,7 @@ async function loadStooqSeries(a, tf) {
 }
 async function loadTwelveSeries(a, tf) {
   const T = TFS[tf];
-  const j = await getJSON(`https://api.twelvedata.com/time_series?symbol=${a.symbol}&interval=${T.td}&outputsize=${tf === '1h' ? 1000 : 500}&timezone=UTC&apikey=${encodeURIComponent(S.twelveKey)}`, { timeout: 20000 });
+  const j = await getJSON(`https://api.twelvedata.com/time_series?symbol=${a.symbol}${a.tdExchange ? '&exchange=' + a.tdExchange : ''}&interval=${T.td}&outputsize=${tf === '1h' ? 1000 : 500}&timezone=UTC&apikey=${encodeURIComponent(S.twelveKey)}`, { timeout: 20000 });
   if (j.status === 'error') throw new Error(tdError(j));
   const bars = cleanBars((j.values || []).map(v => ({ t: parseUTC(v.datetime), o: +v.open, h: +v.high, l: +v.low, c: +v.close, v: +(v.volume || 0) })));
   if (!bars.length) throw new Error('Twelve Data: keine Daten');
@@ -574,7 +576,7 @@ async function loadStockSeries(a, tf) {
 async function loadStockQuote(a) {
   if (S.twelveKey) {
     try {
-      const q = await getJSON(`https://api.twelvedata.com/quote?symbol=${a.symbol}&apikey=${encodeURIComponent(S.twelveKey)}`, { timeout: 20000 });
+      const q = await getJSON(`https://api.twelvedata.com/quote?symbol=${a.symbol}${a.tdExchange ? '&exchange=' + a.tdExchange : ''}&apikey=${encodeURIComponent(S.twelveKey)}`, { timeout: 20000 });
       if (q.status === 'error') throw new Error(tdError(q));
       const fw = q.fifty_two_week || {};
       return { price: +q.close, changePct: +q.percent_change, change: +q.change, high24: +q.high, low24: +q.low, open: +q.open, prevClose: +q.previous_close, volume: +q.volume, avgVolume: +q.average_volume, low52: +fw.low, high52: +fw.high, isOpen: !!q.is_market_open, exchange: q.exchange, name: q.name, updated: (q.timestamp ? q.timestamp * 1000 : Date.now()), source: 'Twelve Data', shares: true };
@@ -746,7 +748,7 @@ class KChart {
   // Index (auch gebrochen oder jenseits des letzten Balkens) für einen Zeitpunkt
   idxForTime(t) { const b = this.bars, n = b.length; if (!n) return null; if (t < b[0].t) return null; if (t >= b[n - 1].t) return (n - 1) + (t - b[n - 1].t) / (this.meta.intervalSec || 86400); let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (b[m].t <= t) lo = m; else hi = m; } const span = b[hi].t - b[lo].t || 1; return lo + (t - b[lo].t) / span; }
   _axisWidth() { const ctx = this.ctx; ctx.font = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'; let mx = 0; for (const b of this.bars) if (b.h > mx) mx = b.h; const s = fmtNum(mx * 1.1 || 1, this.meta.decimals); this.axisW = clamp(Math.ceil(ctx.measureText(s).width) + 16, 48, 110); }
-  fit() { const n = this.bars.length; if (!n) { this.request(); return; } const plotW = this.W - this.axisW; const count = Math.min(n, Math.max(30, Math.round(plotW / 6))); this.view.count = count; this.view.from = n - count + count * 0.06; this._clamp(); this.request(); }
+  fit() { const n = this.bars.length; if (!n) { this.request(); return; } const plotW = this.W - this.axisW; const count = Math.max(12, Math.min(n, Math.max(30, Math.round(plotW / 6)))); this.view.count = count; this.view.from = n - count + count * 0.06; this._clamp(); this.request(); }
   _clamp() { const n = this.bars.length; this.view.count = clamp(this.view.count, 8, Math.max(60, n * 1.5)); this.view.from = clamp(this.view.from, -this.view.count * 0.6, Math.max(0, n - 3)); }
   get plotW() { return this.W - this.axisW; }
   get barW() { return this.plotW / this.view.count; }
@@ -939,7 +941,7 @@ function onLayout(panes) { for (const p of panes) { const el = p.id === 'rsi' ? 
 function sigTag(s) { return s > 0 ? '<span class="sig b">Kauf</span>' : s < 0 ? '<span class="sig s">Verkauf</span>' : '<span class="sig n">Neutral</span>'; }
 function renderTA(an) {
   const card = $('#taCard'); const a = ASSETS[state.selected];
-  if (!an) { card.innerHTML = `<h2>Chart-Analyse</h2><div class="muted small">Keine ausreichenden Kursdaten für ${esc(a.name)} (${TFS[state.tf].label}).</div>`; return; }
+  if (!an) { const ser0 = currentSeries(); const n0 = ser0 ? ser0.bars.length : 0; card.innerHTML = `<h2>Chart-Analyse</h2><div class="muted small">Noch zu wenig Kursdaten für ${esc(a.name)} im Zeitrahmen ${TFS[state.tf].label} (${n0} Kerzen, mindestens 15 nötig).${a.note && /Börsengang/.test(a.note) ? ' Die Aktie ist erst seit Kurzem notiert – Indikatoren werden mit jedem Handelstag aussagekräftiger; für erste Signale den 1h-Zeitrahmen wählen.' : ''}</div>`; return; }
   const dec = an.dec; const pos = (an.score + 1) / 2 * 100; const col = an.score > 0.1 ? 'up' : an.score < -0.1 ? 'down' : '';
   const perf = perfFromDaily(state.data[state.selected].daily);
   const lv = an.levels; const lvHtml = (arr, cls) => arr.length ? arr.map(l => `<div class="l ${cls}">${fmtNum(l.p, dec)} $</div><div class="m">${fmtPct((l.p / an.price - 1) * 100)} zum Kurs · ${l.hits}× getestet</div>`).join('') : '<div class="l muted">–</div><div class="m">kein Swing-Niveau im Bereich</div>';

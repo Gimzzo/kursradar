@@ -69,6 +69,11 @@ const NEWS = {
     ['Yahoo Finance', () => get('https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPCX&region=US&lang=en-US').then(x => parseRss(x, { limit: 12 }))],
     ['Google News (EN)', () => get(gnews('SpaceX stock OR SPCX', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
   ],
+  ANT: [
+    ['Google News (DE)', () => get(gnews('Anthropic Aktie OR Anthropic Börsengang', 'de')).then(x => parseRss(x, { feed: 'google' }))],
+    ['Yahoo Finance', () => get('https://feeds.finance.yahoo.com/rss/2.0/headline?s=ANT&region=US&lang=en-US').then(x => parseRss(x, { limit: 12 }))],
+    ['Google News (EN)', () => get(gnews('Anthropic stock OR Anthropic IPO', 'en')).then(x => parseRss(x, { feed: 'google', limit: 12 }))],
+  ],
   STLA: [
     ['Google News (DE)', () => get(gnews('Stellantis', 'de')).then(x => parseRss(x, { feed: 'google' }))],
     ['Yahoo Finance', () => get('https://feeds.finance.yahoo.com/rss/2.0/headline?s=STLA&region=US&lang=en-US').then(x => parseRss(x, { limit: 12 }))],
@@ -125,7 +130,7 @@ async function updateStock(sym) {
 
 async function main() {
   await mkdir('data', { recursive: true });
-  await Promise.all([updateNews('BTC'), updateNews('XRP'), updateNews('ADA'), updateNews('SPCX'), updateNews('STLA'), updateStock('SPCX'), updateStock('STLA')]);
+  await Promise.all([updateNews('BTC'), updateNews('XRP'), updateNews('ADA'), updateNews('SPCX'), updateNews('ANT'), updateNews('STLA'), updateStock('SPCX'), updateStock('ANT'), updateStock('STLA')]);
   const prev = await readJson('data/status.json'); const keep = (prev && prev.ok) || {};
   await writeJson('data/status.json', { at: NOW, ok: { ...keep, ...status.ok }, errors: status.errors });
   console.log('fertig', new Date(NOW).toISOString(), 'Fehler:', Object.keys(status.errors).length);
