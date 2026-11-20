@@ -515,6 +515,7 @@ async function viaProxy(url, { timeout = 15000, text = false } = {}) {
   throw new Error('kein Proxy erreichbar (' + [...new Set(errs)].join(', ') + ')');
 }
 // Kursradar-Datenfeed: GitHub Actions legt alle 15 Min. data/*.json neben die App (gleiche Domain, kein CORS)
+const FEED_FRESH_MS = 60 * 60000; // älter als 1 Std. gilt als veraltet → Live-Quellen zuerst versuchen
 async function loadLocalData(name) {
   if (!/^https?:$/.test(location.protocol)) throw new Error('nur online verfügbar');
   const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), 12000);
@@ -527,7 +528,7 @@ async function loadLocalStock(a, tf) {
   bars = cleanBars(bars); if (!bars.length) throw new Error('keine Kurse im Feed');
   const q = stockQuoteFromBars(bars, Object.assign({ source: 'Kursradar-Feed · ' + (j.source || 'Yahoo') }, j.meta || {}));
   if (q && !(j.meta && j.meta.regularMarketTime)) q.updated = j.at;
-  return { bars, source: 'Kursradar-Feed (' + (j.source || 'Yahoo') + ', alle 15 Min.)', quote: q, feedAt: j.at };
+  return { bars, source: 'Kursradar-Feed (' + (j.source || 'Yahoo') + ')', quote: q, feedAt: j.at };
 }
 const Y_TF = { '1h': { interval: '60m', range: '6mo' }, '4h': { interval: '60m', range: '1y', agg: 14400 }, '1d': { interval: '1d', range: '5y' }, '1w': { interval: '1wk', range: '10y' } };
 function stockQuoteFromBars(bars, meta) {
@@ -568,8 +569,10 @@ async function loadTwelveSeries(a, tf) {
 async function loadStockSeries(a, tf) {
   const errs = [];
   if (S.twelveKey) { try { return await loadTwelveSeries(a, tf); } catch (e) { errs.push(e.message); } }
-  try { return await loadLocalStock(a, tf); } catch (e) { errs.push('Feed: ' + e.message); }
+  let stale = null;
+  try { const r = await loadLocalStock(a, tf); if (Date.now() - r.feedAt < FEED_FRESH_MS) return r; stale = r; } catch (e) { errs.push('Feed: ' + e.message); }
   try { return await loadYahooSeries(a, tf); } catch (e) { errs.push(e.message); }
+  if (stale) { stale.source += ' · Stand ' + fmtTime(stale.feedAt); return stale; }
   try { return await loadStooqSeries(a, tf); } catch (e) { errs.push(e.message); }
   throw new Error([...new Set(errs)].join(' · ') + (S.twelveKey ? '' : ' – Tipp: kostenlosen Twelve-Data-Key in ⚙ eintragen (direkte Verbindung)'));
 }
@@ -609,13 +612,14 @@ async function loadCryptoCompareNews(a) {
 }
 function withTimeout(p, ms, label) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(label + ': Zeitüberschreitung')), ms))]); }
 async function loadNewsFeed(a) {
-  const errs0 = [];
-  try { const j = await loadLocalData('news-' + a.id); const items = (j.items || []).filter(x => x && x.title && x.url); if (items.length) return { items, source: 'Kursradar-Feed', at: j.at, feeds: j.feeds }; throw new Error('leer'); } catch (e) { errs0.push('Feed: ' + e.message); }
+  const errs0 = []; let staleFeed = null;
+  try { const j = await loadLocalData('news-' + a.id); const items = (j.items || []).filter(x => x && x.title && x.url); if (!items.length) throw new Error('leer'); const r = { items, source: 'Kursradar-Feed', at: j.at, feeds: j.feeds }; if (Date.now() - j.at < FEED_FRESH_MS) return r; staleFeed = r; } catch (e) { errs0.push('Feed: ' + e.message); }
   const chain = a.type === 'crypto'
     ? [['Google News', () => loadGoogleNews(a, 'de')], ['CoinDesk', () => loadCoindeskNews(a)], ['CryptoCompare', () => loadCryptoCompareNews(a)], ['Google News (EN)', () => loadGoogleNews(a, 'en')], ['Bing News', () => loadBingNews(a)]]
     : [['Google News', () => loadGoogleNews(a, 'de')], ['Yahoo Finance', () => loadYahooNews(a)], ['Google News (EN)', () => loadGoogleNews(a, 'en')], ['Bing News', () => loadBingNews(a)]];
   const errs = errs0;
   for (const [name, fn] of chain) { try { const items = await withTimeout(fn(), 25000, name); if (items && items.length) return { items, source: name }; } catch (e) { errs.push(name + ': ' + e.message); } }
+  if (staleFeed) return staleFeed;
   throw new Error(errs.join(' · '));
 }
 
@@ -1077,7 +1081,7 @@ function renderNews() {
   if (d.aiNews && d.aiNews.items && d.aiNews.items.length) body += `<div class="muted small" style="margin-bottom:6px">KI-Suche (${esc(d.aiNews.model || 'Claude')}) · ${timeAgo(d.aiNews.at)}</div><ul class="news">${d.aiNews.items.map(newsItem).join('')}</ul>`;
   if (d.news && d.news.length) {
     const limit = d.newsExpanded ? d.news.length : 5; const shown = d.news.slice(0, limit);
-    body += `<div class="muted small" style="margin:${d.aiNews ? 12 : 0}px 0 6px">${esc(d.newsSource)} · ${timeAgo(d.newsAt)}${/^Google News$/.test(d.newsSource) ? ' · deutschsprachig, letzte 7 Tage' : ''}${/^Kursradar-Feed/.test(d.newsSource) ? ' · alle 15 Min. aktualisiert' : ''}${d.newsStale ? ' · <span class="warn">Aktualisierung fehlgeschlagen, zeige letzte Liste</span>' : ''}</div><ul class="news">${shown.map(newsItem).join('')}</ul>${d.news.length > 5 ? `<button class="btn sm" id="btnNewsMore" style="margin-top:8px">${d.newsExpanded ? 'Weniger anzeigen' : `Mehr anzeigen (${d.news.length - 5} weitere)`}</button>` : ''}`;
+    body += `<div class="muted small" style="margin:${d.aiNews ? 12 : 0}px 0 6px">${esc(d.newsSource)} · ${timeAgo(d.newsAt)}${/^Google News$/.test(d.newsSource) ? ' · deutschsprachig, letzte 7 Tage' : ''}${/^Kursradar-Feed/.test(d.newsSource) ? ' · Stand ' + fmtTime(d.newsAt) : ''}${d.newsStale ? ' · <span class="warn">Aktualisierung fehlgeschlagen, zeige letzte Liste</span>' : ''}</div><ul class="news">${shown.map(newsItem).join('')}</ul>${d.news.length > 5 ? `<button class="btn sm" id="btnNewsMore" style="margin-top:8px">${d.newsExpanded ? 'Weniger anzeigen' : `Mehr anzeigen (${d.news.length - 5} weitere)`}</button>` : ''}`;
   } else if (d.newsLoading) body += `<div class="progress"><span class="spinner"></span> Lade News…</div>`;
   else if (d.err.news) body += `<div class="err-box">News-Feed gerade nicht erreichbar – bitte in einer Minute „Feed neu laden“ versuchen.<details class="small muted" style="margin-top:4px"><summary>Details</summary>${esc(d.err.news)}</details></div>`;
   const busy = d.aiNewsLoading;

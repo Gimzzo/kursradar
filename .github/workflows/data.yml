@@ -1,17 +1,26 @@
 name: Daten aktualisieren
+# Läuft als Kette: jeder Lauf holt die Daten, wartet 14 Minuten und startet den nächsten Lauf per
+# workflow_dispatch. Grund: GitHub führt den Zeitplan (schedule) dieses Repos nur etwa alle 6 Stunden
+# aus; der Zeitplan bleibt als Neustart der Kette erhalten, falls sie einmal abreißt.
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '7,37 * * * *'
   workflow_dispatch:
+    inputs:
+      chained:
+        description: 'Von einem vorherigen Lauf gestartet'
+        type: boolean
+        default: false
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: data-update
   cancel-in-progress: false
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Feeds und Kurse abrufen
@@ -25,3 +34,12 @@ jobs:
           git commit -q -m "Daten: $(date -u +'%Y-%m-%d %H:%M') UTC"
           git pull -q --rebase origin main
           git push -q
+      - name: Nächsten Lauf in 14 Minuten starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 840
+          others=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/data.yml/runs?per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID}) | select(.status == \"queued\" or .status == \"in_progress\" or .status == \"waiting\" or .status == \"pending\")] | length")
+          if [ "${others:-0}" != "0" ]; then echo "Anderer Lauf aktiv ($others) – keine Kette nötig"; exit 0; fi
+          gh workflow run data.yml --ref main -f chained=true && echo "Nächster Lauf gestartet"
